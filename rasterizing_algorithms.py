@@ -73,14 +73,14 @@ def PrintTriangleWireframe(img, x0, y0, x1, y1, x2, y2, color):
 def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0, h1, h2, w0, w1, w2):
     
     # Coordenades de la textura associades a cada vertex numero entre 0 i 1:
-    T0X = 0.2
-    T0Y = 0.2
+    T0X = 0.2 / h0
+    T0Y = 0.2 / h0
     
-    T1X = 1
-    T1Y = 0.2
+    T1X = 1 / h1
+    T1Y = 0.2 / h1
     
-    T2X = 0.5
-    T2Y = 1
+    T2X = 0.5 / h2
+    T2Y = 1 / h2
     
     texture_height, texture_width = texture.shape[0:2]
 
@@ -184,38 +184,22 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
             
             # El pixel buffer tindra el invers de les distancies, anira de 0 a infinit
             # Com mes a prop estigui un objecte, mes gran sera el valor del invers:
-            alpha_3D = (alpha + n * sx * alpha_dx) * w0
-            beta_3D = (beta + n * sx * beta_dx) * w1
-            gamma_3D = (gamma + n * sx * gamma_dx) * w2
             
-            normalize_coeficient = alpha_3D + beta_3D + gamma_3D
-            
-            alpha_3D = alpha_3D / normalize_coeficient
-            beta_3D = beta_3D / normalize_coeficient
-            gamma_3D = gamma_3D / normalize_coeficient
-            
+            # Calculem les coordenades baricentriques del triangle projectat
             alpha_2D = alpha + n * sx * alpha_dx
             beta_2D = beta + n * sx * beta_dx
             gamma_2D = gamma + n * sx * gamma_dx
                 
-            # Interpolacion amb perspectiva amb les coordenades baricentriques 3D
-            # pixel_depth_inv = alpha_3D * (1 / h0) + beta_3D * (1 / h1) + gamma_3D * (1 / h2)
-            # pixel_depth_inv = 1 / (alpha_3D * h0 + beta_3D * h1 + gamma_3D * h2)
-            
+            # Interpolacio amb perspectiva amb les coordenades baricentriques -> Z-buffer  
             pixel_depth_inv = alpha_2D * (1 / h0) + beta_2D * (1 / h1) + gamma_2D * (1 / h2)
             
-            # Coordenades de la textura:
-                
-            # u = 1 / (alpha_2D * (1 / T0X) + beta_2D * (1 / T1X) + gamma_2D * (1 / T2X))
-            # v = 1 / (alpha_2D * (1 / T0Y) + beta_2D * (1 / T1Y) + gamma_2D * (1 / T2Y))
-            
-            u = alpha_2D * T0X + beta_2D * T1X + gamma_2D *  T2X
-            v = alpha_2D * T0Y + beta_2D * T1Y + gamma_2D *  T2Y
-            
+            # Coordenades de la textura interpolades amb perspectiva:
+            u = (alpha_2D * T0X + beta_2D * T1X + gamma_2D * T2X) / pixel_depth_inv
+            v = (alpha_2D * T0Y + beta_2D * T1Y + gamma_2D * T2Y) / pixel_depth_inv
             tex_x = int(u * texture_width)
             tex_y = int(v * texture_height)
             
-            # # Asegurar que estén dentro de los límites
+            # Assegurem que les coordenades estiguin dins els limits:
             tex_x = max(0, min(texture_width - 1, tex_x))
             tex_y = max(0, min(texture_height - 1, tex_y))
             
@@ -226,7 +210,6 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
                 
                 # Pintem el pixel corresponent
                 img[y0_02, x] = texture[tex_y, tex_x]
-                # img[y0_02, x] = texture[y0_02, x]
                 # img[y0_02, x] = color
             
             n += 1
@@ -285,25 +268,26 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
             
             # Si hem arribat al final, pintem l'ultim punt i sortim del loop:
                 
-            alpha_3D = alpha * w0
-            beta_3D = beta * w1
-            gamma_3D = gamma * w2
+            # Interpolacio amb perspectiva amb les coordenades baricentriques -> Z-buffer  
+            pixel_depth_inv = alpha_2D * (1 / h0) + beta_2D * (1 / h1) + gamma_2D * (1 / h2)
             
-            normalize_coeficient = alpha_3D + beta_3D + gamma_3D
+            # Coordenades de la textura interpolades amb perspectiva:
+            u = (alpha_2D * T0X + beta_2D * T1X + gamma_2D * T2X) / pixel_depth_inv
+            v = (alpha_2D * T0Y + beta_2D * T1Y + gamma_2D * T2Y) / pixel_depth_inv
+            tex_x = int(u * texture_width)
+            tex_y = int(v * texture_height)
             
-            alpha_3D = alpha_3D / normalize_coeficient
-            beta_3D = beta_3D / normalize_coeficient
-            gamma_3D = gamma_3D / normalize_coeficient
-                
-            # Interpolacion amb perspectiva amb les coordenades baricentriques 3D
-            pixel_depth_inv = alpha_3D * (1 / h0) + beta_3D * (1 / h1) + gamma_3D * (1 / h2)
+            # Assegurem que les coordenades estiguin dins els limits:
+            tex_x = max(0, min(texture_width - 1, tex_x))
+            tex_y = max(0, min(texture_height - 1, tex_y))
             
             if depth_buffer[y0_02, x0_02] < pixel_depth_inv:
                 
                 depth_buffer[y0_02, x0_02] = pixel_depth_inv
                
                 # Pintem el pixel corresponent
-                img[y0_02, x0_02] = color
+                # img[y0_02, x0_02] = color
+                img[y0_02, x0_02] = texture[tex_y, tex_x]
                 
             break
 
