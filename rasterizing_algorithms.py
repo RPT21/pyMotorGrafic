@@ -203,7 +203,6 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
             tex_x = max(0, min(texture_width - 1, tex_x))
             tex_y = max(0, min(texture_height - 1, tex_y))
             
-            
             if depth_buffer[y0_02, x] < pixel_depth_inv:
                 
                 depth_buffer[y0_02, x] = pixel_depth_inv
@@ -269,11 +268,11 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
             # Si hem arribat al final, pintem l'ultim punt i sortim del loop:
                 
             # Interpolacio amb perspectiva amb les coordenades baricentriques -> Z-buffer  
-            pixel_depth_inv = alpha_2D * (1 / h0) + beta_2D * (1 / h1) + gamma_2D * (1 / h2)
+            pixel_depth_inv = alpha * (1 / h0) + beta * (1 / h1) + gamma * (1 / h2)
             
             # Coordenades de la textura interpolades amb perspectiva:
-            u = (alpha_2D * T0X + beta_2D * T1X + gamma_2D * T2X) / pixel_depth_inv
-            v = (alpha_2D * T0Y + beta_2D * T1Y + gamma_2D * T2Y) / pixel_depth_inv
+            u = (alpha * T0X + beta * T1X + gamma * T2X) / pixel_depth_inv
+            v = (alpha * T0Y + beta * T1Y + gamma * T2Y) / pixel_depth_inv
             tex_x = int(u * texture_width)
             tex_y = int(v * texture_height)
             
