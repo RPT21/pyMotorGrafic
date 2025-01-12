@@ -4,11 +4,24 @@ class Triangle:
     
     def __init__(self, vertex0, vertex1, vertex2, color, specular, reflectance):
         
+        vertex0 = np.array(vertex0)
+        vertex1 = np.array(vertex1)
+        vertex2 = np.array(vertex2)
+        
         self.vertexs = np.array([vertex0, vertex1, vertex2], dtype = np.float64)
         self.triangles = np.array([[0,1,2]], dtype = np.uint16)
         self.color = np.array(color, dtype = np.uint8)
         self.specular = specular
         self.reflectance = reflectance
+        
+        AB = vertex1 - vertex0
+        AC = vertex2 - vertex0
+        
+        normal = np.cross(AC, AB)
+        norm = np.linalg.norm(normal)
+        normal = normal / norm
+        
+        self.triangle_vertexs_normal = np.array([[normal, normal, normal]], dtype = np.float64)
         
         self.number_vertexs = 3
         self.number_triangles = 1
@@ -27,6 +40,15 @@ class Rectangle:
         self.color = np.array(color, dtype = np.uint8)
         self.specular = specular
         self.reflectance = reflectance
+        
+        self.triangle_vertexs_normal = np.empty((0,3,3), dtype = np.float64)
+        for triangle in self.triangles:
+            AB = self.vertexs[triangle[1]] - self.vertexs[triangle[0]]
+            AC = self.vertexs[triangle[2]] - self.vertexs[triangle[0]]
+            normal = np.cross(AC, AB)
+            norm = np.linalg.norm(normal)
+            normal = normal / norm
+            self.triangle_vertexs_normal = np.vstack((self.triangle_vertexs_normal, [[normal, normal, normal]]))
         
         self.number_vertexs = 4
         self.number_triangles = 2
@@ -48,10 +70,19 @@ class RectanglePrisma():
         vertex7 = vertexH + vertex3 #3H
 
         self.vertexs = np.array([vertex0, vertex1, vertex2, vertex3, vertex4, vertex5, vertex6, vertex7], dtype = np.float64)
-        self.triangles = np.array([[0, 1, 2], [4, 6, 5],[0, 4, 1], [0, 2, 4],[1, 5, 3], [2, 3, 6],[3, 2, 1], [7, 5, 6],[1, 4, 5], [4, 2, 6],[3, 5, 7], [3, 7, 6]], dtype = np.uint16)
+        self.triangles = np.array([[0, 1, 2], [4, 6, 5], [0, 4, 1], [0, 2, 4], [1, 5, 3], [2, 3, 6], [3, 2, 1], [7, 5, 6], [1, 4, 5], [4, 2, 6], [3, 5, 7], [3, 7, 6]], dtype = np.uint16)
         self.color = np.array(color, dtype = np.uint8)
         self.specular = specular
         self.reflectance = reflectance
+        
+        self.triangle_vertexs_normal = np.empty((0,3,3), dtype = np.float64)
+        for triangle in self.triangles:
+            AB = self.vertexs[triangle[1]] - self.vertexs[triangle[0]]
+            AC = self.vertexs[triangle[2]] - self.vertexs[triangle[0]]
+            normal = np.cross(AC, AB)
+            norm = np.linalg.norm(normal)
+            normal = normal / norm
+            self.triangle_vertexs_normal = np.vstack((self.triangle_vertexs_normal, [[normal, normal, normal]]))
         
         self.number_vertexs = 8
         self.number_triangles = 12
@@ -173,6 +204,12 @@ class Scene:
         
         
         self.lights.append(light_dict)
+        
+        
+rectangle0 = Rectangle([0,0,0],[-5,0,0],[0,5,0], [200,50,250], -1, 0)
+triangle0 = Triangle([0,0,0],[-5,0,0],[0,5,0], [200,50,250], -1, 0)
+triangle1 = Triangle([0,0,0],[0,5,0],[0,0,6], [0,250,0], 0.2, 0)
+RectanglePrisma0 = RectanglePrisma([-1,1,0], [1,1,0], [-1,-1,0], [-1,1,5], [0,0,255], 0.2, 0)
     
    
 

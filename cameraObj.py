@@ -28,7 +28,53 @@ class camera():
         self.mida_pixel_y = len_y/pixels_y
         
         self.changeBaseMatrix = np.array([self.coordX_pantalla, self.coordY_pantalla, self.vect_direct_cam], dtype = np.float64)
+        
+        # Definim els plans de clipping, son exclusius per el rasterizer:
+        # Com que sempre estem fent un canvi de base al sistema de coordenades de la camera
+        # Aquests plans es mantenen invariants en les coordenades de la camara
+        # I per tant, nomes s'han de calcular una vegada, i estan definits respecte
+        # el sistema de coordenades de la camera
+        
+        # Equacio del pla: Ax + By + Cz + D = 0
+        # Tenim 5 plans, el primer es el propi pla de projeccio, situat a z = d
+        # La resta de plans estan definits per els cantons de la pantalla i el punt
+        # de projeccio. Com que el punt de projeccio esta a l'origen i tots els 4 plans
+        # passen per el punt de projeccio, sabem que D = 0.
+        
+        # Recordem que en el sistema de coordenades de la pantalla, la Z entra al paper
+        # La X creix cap a la dreta, i la Y creix cap avall.
+        
+        epsilon = 0.005
+        div = 2 + epsilon
 
+        costatEsquerraInferior = [-(len_x / div), +(len_y / div), d]
+        costatEsquerraSuperior = [-(len_x / div), -(len_y / div), d]
+        costatDretInferior = [+(len_x / div), +(len_y / div), d]
+        costatDretSuperior = [+(len_x / div), -(len_y / div), d]
+
+        clippingPlanes = np.empty((5,4), dtype=np.float64)
+
+        # Els plans s'han de definir tal que el vector perpendicular al pla apunti
+        # cap a dintre del volum, aixi, nomes els punts dintre del camp de visio tindran
+        # un valor positiu al ser evaluats per l'equacio de cadascun dels plans
+
+        # Pla frontal
+        
+        # clippingPlanes[0,:] = np.array([0,0,1,-d])
+        # clippingPlanes[0,:] = np.array([0,0,1,0])
+        clippingPlanes[0,:] = np.array([0,0,1,0.001])
+        
+        # Pla superior
+        clippingPlanes[1,:] = definePlane([0,0,0], costatEsquerraSuperior, costatDretSuperior)
+        # Pla dreta
+        clippingPlanes[2,:] = definePlane([0,0,0], costatDretSuperior, costatDretInferior)
+        # Pla inferior
+        clippingPlanes[3,:] = definePlane([0,0,0], costatDretInferior, costatEsquerraInferior)
+        # Pla esquerra
+        clippingPlanes[4,:] = definePlane([0,0,0], costatEsquerraInferior, costatEsquerraSuperior)
+        
+        self.clippingPlanes = clippingPlanes
+        
         
     def rotateCamara(self,theta, phi):
         # Efectuem la rotacio a la direccio que volem mirar
@@ -347,3 +393,16 @@ def EsfericaToCartesiana(punt):
     z = r * np.cos(theta)
     
     return np.array([x,y,z])
+
+
+def definePlane(Point, vec1, vec2):
+    
+    normal_vector = np.cross(vec1, vec2)
+    norm = np.linalg.norm(normal_vector)
+    normal_vector = normal_vector / norm
+    
+    # Construim el pla de la pantalla
+    D = -(normal_vector[0]*Point[0] + normal_vector[1]*Point[1] + normal_vector[2]*Point[2])
+    return np.array([normal_vector[0], normal_vector[1], normal_vector[2], D])
+
+    
