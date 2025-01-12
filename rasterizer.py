@@ -28,8 +28,11 @@ Camera.followPoint([0,0,0])
 # Coordenades [X, Y, Z]:
 # scene.addInstance(RectanglePrisma([-1,1,0], [1,1,0], [-1,-1,0], [-1,1,5], [0,0,255], 0.2, 0))
 
+# Minecraft Cube :D
+scene.addInstance(RectanglePrisma([-1,1,0], [1,1,0], [-1,-1,0], [-1,1,2], [0,0,255], 0.2, 0))
+
 # scene.addInstance(Triangle([-0.5,0,0],[1,5,0],[1,0,6], [0,0,250], 0.2, 0))
-scene.addInstance(Triangle([0,0,0],[0,5,0],[0,0,6], [0,250,0], 0.2, 0))
+# scene.addInstance(Triangle([0,0,0],[0,5,0],[0,0,6], [0,250,0], 0.2, 0))
 
 # scene.addInstance(Triangle([0,0,0],[6,0,0],[0,5,0], [0,0,250], 0.2, 0))
 # scene.addInstance(Triangle([0,0,0],[0,5,0],[0,0,6], [0,250,0], 0.2, 0))
@@ -38,11 +41,14 @@ scene.addInstance(Triangle([0,0,0],[0,5,0],[0,0,6], [0,250,0], 0.2, 0))
 # scene.addSphere([0,0,0], 1.0, 2, [100,200,100])
 
 # scene.addLight([5,5,5], "puntual", 0.6)
-scene.addLight([0.5,1,1], "puntual", 0.8)
+scene.addLight([1.5,1,1], "puntual", 0.8)
 scene.addLight([-5,5,5], "directional", 0.1)
 scene.addLight([0,0,0], "ambiental", 0.1)
 
 texture_array = np.asarray(Image.open("texture_example.jpg"))
+grass = np.asarray(Image.open("Grass_Block.jpg"))
+grass_dirt = np.asarray(Image.open("Grass_Block_Dirt.jpg"))
+dirt = np.asarray(Image.open("Dirt.jpg"))
 
 number_triangles = scene.total_triangles
 number_vertexs = scene.total_vertexs
@@ -55,25 +61,24 @@ triangle_reflectance = np.empty(number_triangles, dtype = np.float32)
 triangle_texels = np.empty((number_triangles,3,2))
 triangle_vertexs_normal = np.empty((number_triangles, 3, 3))
 
-
-T0X = 0.2
-T0Y = 0.2
-
-T1X = 1
-T1Y = 0.2
-
-T2X = 0.5
-T2Y = 1
-
-triangle_texels[0,0,0] = T0X
-triangle_texels[0,0,1] = T0Y
-
-triangle_texels[0,1,0] = T1X
-triangle_texels[0,1,1] = T1Y
-
-triangle_texels[0,2,0] = T2X
-triangle_texels[0,2,1] = T2Y
-
+for n in range(number_triangles):
+    T0X = 0.2
+    T0Y = 0.2
+    
+    T1X = 1
+    T1Y = 0.2
+    
+    T2X = 0.5
+    T2Y = 1
+    
+    triangle_texels[n,0,0] = T0X
+    triangle_texels[n,0,1] = T0Y
+    
+    triangle_texels[n,1,0] = T1X
+    triangle_texels[n,1,1] = T1Y
+    
+    triangle_texels[n,2,0] = T2X
+    triangle_texels[n,2,1] = T2Y
 
 index_vertexs = 0
 index_triangles = 0
@@ -172,11 +177,12 @@ def print_image(image, depth_buffer, texture_array, changeBaseMatrix,
         indexB = triangles[n,1]
         indexC = triangles[n,2]
         color = triangle_color[n]
+        t_texels = np.array([triangle_texels[n]])
         
         triangle_vertexs = np.array([[changeBase_vertexs[indexA], changeBase_vertexs[indexB], changeBase_vertexs[indexC]]])
         
         new_vertexs, new_triangles, new_triangle_color, new_triangle_texels, new_triangle_vertexs_normal = \
-        ClipTriangle(triangle_vertexs, color, clippingPlanes, new_vertexs, new_triangles, new_triangle_color, triangle_texels, changeBase_triangle_vertexs_normal)
+        ClipTriangle(triangle_vertexs, color, clippingPlanes, new_vertexs, new_triangles, new_triangle_color, t_texels, [changeBase_triangle_vertexs_normal[n]], new_triangle_texels, new_triangle_vertexs_normal)
         
     if new_vertexs.shape[0] == 0:
         return image
@@ -243,19 +249,20 @@ def print_image(image, depth_buffer, texture_array, changeBaseMatrix,
                       vertex_normals,
                       d,
                       phongShading=True,
-                      useTexture=True)
+                      useTexture=True,
+                      bilinearFilter=True)
             
     return image
 
 def SignedDistance(point, plane):
     return point[0]*plane[0] + point[1]*plane[1] + point[2]*plane[2] + plane[3]
 
-def ClipTriangle(clipped_triangles, color, planes, new_vertexs, new_triangles, new_triangle_color, triangle_texels, triangle_vertexs_normal):
+def ClipTriangle(clipped_triangles, color, planes, new_vertexs, new_triangles, new_triangle_color, triangle_texels, triangle_vertexs_normal, new_triangle_texels, new_triangle_vertexs_normal):
     # Aquesta funcio pot retornar 0, 1 o 2 triangles
     for plane in planes:
         clipped_triangles, triangle_texels, triangle_vertexs_normal = ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_vertexs_normal, plane)
         if clipped_triangles.shape[0] == 0:
-            return new_vertexs, new_triangles, new_triangle_color, triangle_texels, triangle_vertexs_normal
+            return new_vertexs, new_triangles, new_triangle_color, new_triangle_texels, new_triangle_vertexs_normal
         
     index_vertexs = new_vertexs.shape[0]
     
@@ -273,7 +280,10 @@ def ClipTriangle(clipped_triangles, color, planes, new_vertexs, new_triangles, n
         
         index_vertexs += 3
         
-    return new_vertexs, new_triangles, new_triangle_color, triangle_texels, triangle_vertexs_normal
+    new_triangle_texels = np.vstack((new_triangle_texels, triangle_texels))
+    new_triangle_vertexs_normal = np.vstack((new_triangle_vertexs_normal, triangle_vertexs_normal))
+        
+    return new_vertexs, new_triangles, new_triangle_color, new_triangle_texels, new_triangle_vertexs_normal
 
         
 def ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_vertexs_normal, plane):
@@ -512,7 +522,7 @@ while not glfw.window_should_close(window):
     
     image = print_image(np.copy(blank_image), 
                         np.copy(depth_buffer_init),
-                        texture_array, 
+                        dirt, 
                         Camera.changeBaseMatrix, 
                         Camera.clippingPlanes, 
                         vertexs, 

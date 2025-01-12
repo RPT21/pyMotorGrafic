@@ -70,7 +70,10 @@ def PrintTriangleWireframe(img, x0, y0, x1, y1, x2, y2, color):
 
 
 @njit
-def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0, h1, h2, T0X, T0Y, T1X, T1Y, T2X, T2Y, changeBase_light_matrix, projectedA, projectedB, projectedC, vertex_normals, d, phongShading = False, useTexture = False):
+def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, 
+                  h0, h1, h2, T0X, T0Y, T1X, T1Y, T2X, T2Y, changeBase_light_matrix, 
+                  projectedA, projectedB, projectedC, vertex_normals, d, 
+                  phongShading = False, useTexture = False, bilinearFilter = False):
     
     # Coordenades de la textura associades a cada vertex numero entre 0 i 1:
     if useTexture:
@@ -200,12 +203,47 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
                 u = (alpha_2D * T0X + beta_2D * T1X + gamma_2D * T2X) / pixel_depth_inv
                 v = (alpha_2D * T0Y + beta_2D * T1Y + gamma_2D * T2Y) / pixel_depth_inv
                 
-                tex_x = int(u * texture_width)
-                tex_y = int(v * texture_height)
+                tex_x = u * texture_width
+                tex_y = v * texture_height
                 
                 # Assegurem que les coordenades estiguin dins els limits:
                 tex_x = max(0, min(texture_width - 1, tex_x))
                 tex_y = max(0, min(texture_height - 1, tex_y))
+                
+                if bilinearFilter:
+                
+                    tx = int(tex_x)
+                    ty = int(tex_y)
+                    fx = tex_x - tx
+                    fy = tex_y - ty
+                    
+                    TL = texture[ty, tx]
+                    
+                    if tx + 1 < texture_width:
+                        TR = texture[ty, tx + 1]
+                    else:
+                        TR = texture[ty, tx]
+                        
+                    if ty + 1 < texture_height:
+                        BL = texture[ty + 1, tx]
+                    else:
+                        BL = texture[ty, tx]
+                        
+                    if tx + 1 < texture_width and ty + 1 < texture_height:
+                        BR = texture[ty + 1, tx + 1]
+                    else:
+                        BR = texture[ty, tx]
+                        
+                    CT = fx * TR + (1 - fx) * TL
+                    CB = fx * BR + (1 - fx) * BL
+                    
+                    texture_color = fy * CB + (1 - fy) * CT
+                    
+                else:
+                    
+                    tx = int(tex_x)
+                    ty = int(tex_y)
+                    texture_color = texture[ty, tx].astype(np.float64)
             
             if phongShading:
                 # Calculem el phong Shading:
@@ -261,7 +299,7 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
                 
                 # Pintem el pixel corresponent
                 if useTexture:
-                    img[y0_02, x] = texture[tex_y, tex_x].astype(np.float64) * pixel_intensity
+                    img[y0_02, x] = texture_color * pixel_intensity
                 else:
                     img[y0_02, x] = color * pixel_intensity
             
@@ -328,12 +366,48 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
                 # Coordenades de la textura interpolades amb perspectiva:
                 u = (alpha * T0X + beta * T1X + gamma * T2X) / pixel_depth_inv
                 v = (alpha * T0Y + beta * T1Y + gamma * T2Y) / pixel_depth_inv
-                tex_x = int(u * texture_width)
-                tex_y = int(v * texture_height)
+                
+                tex_x = u * texture_width
+                tex_y = v * texture_height
                 
                 # Assegurem que les coordenades estiguin dins els limits:
                 tex_x = max(0, min(texture_width - 1, tex_x))
                 tex_y = max(0, min(texture_height - 1, tex_y))
+                
+                if bilinearFilter:
+                    
+                    tx = int(tex_x)
+                    ty = int(tex_y)
+                    fx = tex_x - tx
+                    fy = tex_y - ty
+                    
+                    TL = texture[ty, tx]
+                    
+                    if tx + 1 < texture_width:
+                        TR = texture[ty, tx + 1]
+                    else:
+                        TR = texture[ty, tx]
+                        
+                    if ty + 1 < texture_height:
+                        BL = texture[ty + 1, tx]
+                    else:
+                        BL = texture[ty, tx]
+                        
+                    if tx + 1 < texture_width and ty + 1 < texture_height:
+                        BR = texture[ty + 1, tx + 1]
+                    else:
+                        BR = texture[ty, tx]
+                        
+                    CT = fx * TR + (1 - fx) * TL
+                    CB = fx * BR + (1 - fx) * BL
+                    
+                    texture_color = fy * CB + (1 - fy) * CT
+
+                else:
+                    
+                    tx = int(tex_x)
+                    ty = int(tex_y)
+                    texture_color = texture[ty, tx].astype(np.float64)
             
             if phongShading:
                 # Calculem el phong Shading:
@@ -388,7 +462,7 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
                
                 # Pintem el pixel corresponent
                 if useTexture:
-                    img[y0_02, x0_02] = texture[tex_y, tex_x].astype(np.float64) * pixel_intensity
+                    img[y0_02, x0_02] = texture_color * pixel_intensity
                 else:
                     img[y0_02, x0_02] = color * pixel_intensity
                     
