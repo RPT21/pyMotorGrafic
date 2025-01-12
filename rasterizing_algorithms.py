@@ -211,6 +211,7 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
                 # Calculem el phong Shading:
                 projected_point = alpha_2D * projectedA + beta_2D * projectedB + gamma_2D * projectedC
                 real_point = projected_point / (d * pixel_depth_inv)
+                real_point[2] = 1 / pixel_depth_inv
                 
                 # Analitzem quina cara del triangle estem mirant, recordem que la camera esta al origen:
                 camera_vector = -real_point
@@ -338,6 +339,7 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color, h0,
                 # Calculem el phong Shading:
                 projected_point = alpha * projectedA + beta * projectedB + gamma * projectedC
                 real_point = projected_point / (d * pixel_depth_inv)
+                real_point[2] = 1 / pixel_depth_inv
                 
                 # Analitzem quina cara del triangle estem mirant, recordem que la camera esta al origen:
                 camera_vector = -real_point
