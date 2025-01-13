@@ -427,11 +427,14 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
                     real_point = projected_point / (d * pixel_depth_inv)
                     real_point[2] = 1 / pixel_depth_inv
                     
+                    # Interpolem la normal a cada pixel amb perspectiva:
+                    vertex_normal = (alpha * normalA + beta * normalB + gamma * normalC) / pixel_depth_inv
+                    
                     # Analitzem quina cara del triangle estem mirant, recordem que la camera esta al origen:
                     camera_vector = -real_point
                     camera_vector_norm = np.linalg.norm(camera_vector)
                     camera_vector = camera_vector / camera_vector_norm
-                    dot_prod_camera_triangle = np.dot(camera_vector, vertex_normals[0])
+                    dot_prod_camera_triangle = np.dot(camera_vector, vertex_normal)
                     if dot_prod_camera_triangle > 0:
                         isTriangleFrontside = True
                     else:
@@ -450,7 +453,7 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
                             L_norm = np.linalg.norm(L)
                             L = L / L_norm
                             
-                            dot_prod_light = np.dot(L, vertex_normals[0])
+                            dot_prod_light = np.dot(L, vertex_normal)
                             
                             if dot_prod_light > 0:
                                 isLightFrontside = True
