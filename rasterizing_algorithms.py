@@ -74,19 +74,6 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
                   h0, h1, h2, T0X, T0Y, T1X, T1Y, T2X, T2Y, changeBase_light_matrix, 
                   projectedA, projectedB, projectedC, vertex_normals, d, 
                   phongShading = False, useTexture = False, bilinearFilter = False):
-    
-    # Coordenades de la textura associades a cada vertex numero entre 0 i 1:
-    if useTexture:
-        T0X = T0X / h0
-        T0Y = T0Y / h0
-        
-        T1X = T1X / h1
-        T1Y = T1Y / h1
-        
-        T2X = T2X / h2
-        T2Y = T2Y / h2
-        
-        texture_height, texture_width = texture.shape[0:2]
 
     # Suposarem que aquesta funcio s'efectua sobre triangles als quals se'ls ha fet clipping
     # Per evitar que qualsevol dels punts quedi fora de la pantalla
@@ -106,7 +93,24 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
     if denominador == 0:
         # No hi ha area a pintar
         return
+    
+    if useTexture:
+        # Coordenades de la textura associades a cada vertex numero entre 0 i 1:
+        T0X = T0X / h0
+        T0Y = T0Y / h0
         
+        T1X = T1X / h1
+        T1Y = T1Y / h1
+        
+        T2X = T2X / h2
+        T2Y = T2Y / h2
+        
+    if phongShading:
+        # Guardem les normals dels vertexs per despres interpolar amb perspectiva:
+        normalA = vertex_normals[0] / h0
+        normalB = vertex_normals[1] / h1
+        normalC = vertex_normals[2] / h2
+    
     # Definim els increments (gradients) de coordenades baricèntriques: alpha, beta, gamma:
     alpha_dx = (y1 - y2) / denominador
     alpha_dy = (x2 - x1) / denominador
@@ -197,113 +201,117 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
             # Interpolacio amb perspectiva amb les coordenades baricentriques -> Z-buffer  
             pixel_depth_inv = alpha_2D * (1 / h0) + beta_2D * (1 / h1) + gamma_2D * (1 / h2)
             
-            if useTexture:
-            
-                # Coordenades de la textura interpolades amb perspectiva:
-                u = (alpha_2D * T0X + beta_2D * T1X + gamma_2D * T2X) / pixel_depth_inv
-                v = (alpha_2D * T0Y + beta_2D * T1Y + gamma_2D * T2Y) / pixel_depth_inv
-                
-                tex_x = u * texture_width
-                tex_y = v * texture_height
-                
-                # Assegurem que les coordenades estiguin dins els limits:
-                tex_x = max(0, min(texture_width - 1, tex_x))
-                tex_y = max(0, min(texture_height - 1, tex_y))
-                
-                if bilinearFilter:
-                
-                    tx = int(tex_x)
-                    ty = int(tex_y)
-                    fx = tex_x - tx
-                    fy = tex_y - ty
-                    
-                    TL = texture[ty, tx]
-                    
-                    if tx + 1 < texture_width:
-                        TR = texture[ty, tx + 1]
-                    else:
-                        TR = texture[ty, tx]
-                        
-                    if ty + 1 < texture_height:
-                        BL = texture[ty + 1, tx]
-                    else:
-                        BL = texture[ty, tx]
-                        
-                    if tx + 1 < texture_width and ty + 1 < texture_height:
-                        BR = texture[ty + 1, tx + 1]
-                    else:
-                        BR = texture[ty, tx]
-                        
-                    CT = fx * TR + (1 - fx) * TL
-                    CB = fx * BR + (1 - fx) * BL
-                    
-                    texture_color = fy * CB + (1 - fy) * CT
-                    
-                else:
-                    
-                    tx = int(tex_x)
-                    ty = int(tex_y)
-                    texture_color = texture[ty, tx].astype(np.float64)
-            
-            if phongShading:
-                # Calculem el phong Shading:
-                projected_point = alpha_2D * projectedA + beta_2D * projectedB + gamma_2D * projectedC
-                real_point = projected_point / (d * pixel_depth_inv)
-                real_point[2] = 1 / pixel_depth_inv
-                
-                # Analitzem quina cara del triangle estem mirant, recordem que la camera esta al origen:
-                camera_vector = -real_point
-                camera_vector_norm = np.linalg.norm(camera_vector)
-                camera_vector = camera_vector / camera_vector_norm
-                dot_prod_camera_triangle = np.dot(camera_vector, vertex_normals[0])
-                if dot_prod_camera_triangle > 0:
-                    isTriangleFrontside = True
-                else:
-                    isTriangleFrontside = False
-                
-                # Calculem la llum que arriba a cada pixel del triangle:
-                pixel_intensity = 0
-                for light in changeBase_light_matrix:
-                    if light[3] == 0 or light[3] == 1: # LLum puntual o direccional
-                        
-                        if light[3] == 0:
-                            L = light[0:3] - real_point
-                        else:
-                            L = light[0:3]
-                            
-                        L_norm = np.linalg.norm(L)
-                        L = L / L_norm
-                        
-                        dot_prod_light = np.dot(L, vertex_normals[0])
-                        
-                        if dot_prod_light > 0:
-                            isLightFrontside = True
-                        else:
-                            isLightFrontside = False
-                            
-                        if isTriangleFrontside == isLightFrontside:
-                            pixel_intensity += light[4] * abs(dot_prod_light)
-                    else:
-                        pixel_intensity += light[4]
-                        
-                if pixel_intensity > 1:
-                    pixel_intensity = 1
-            
-            else:
-                pixel_intensity = 1
-
+            n += 1
             
             if depth_buffer[y0_02, x] < pixel_depth_inv:
                 
                 depth_buffer[y0_02, x] = pixel_depth_inv
+                
+                if useTexture:
+                    
+                    texture_height, texture_width = texture.shape[0:2]
+                    # Coordenades de la textura interpolades amb perspectiva:
+                    u = (alpha_2D * T0X + beta_2D * T1X + gamma_2D * T2X) / pixel_depth_inv
+                    v = (alpha_2D * T0Y + beta_2D * T1Y + gamma_2D * T2Y) / pixel_depth_inv
+                    
+                    tex_x = u * texture_width
+                    tex_y = v * texture_height
+                    
+                    # Assegurem que les coordenades estiguin dins els limits:
+                    tex_x = max(0, min(texture_width - 1, tex_x))
+                    tex_y = max(0, min(texture_height - 1, tex_y))
+                    
+                    if bilinearFilter:
+                    
+                        tx = int(tex_x)
+                        ty = int(tex_y)
+                        fx = tex_x - tx
+                        fy = tex_y - ty
+                        
+                        TL = texture[ty, tx]
+                        
+                        if tx + 1 < texture_width:
+                            TR = texture[ty, tx + 1]
+                        else:
+                            TR = texture[ty, tx]
+                            
+                        if ty + 1 < texture_height:
+                            BL = texture[ty + 1, tx]
+                        else:
+                            BL = texture[ty, tx]
+                            
+                        if tx + 1 < texture_width and ty + 1 < texture_height:
+                            BR = texture[ty + 1, tx + 1]
+                        else:
+                            BR = texture[ty, tx]
+                            
+                        CT = fx * TR + (1 - fx) * TL
+                        CB = fx * BR + (1 - fx) * BL
+                        
+                        texture_color = fy * CB + (1 - fy) * CT
+                        
+                    else:
+                        
+                        tx = int(tex_x)
+                        ty = int(tex_y)
+                        texture_color = texture[ty, tx].astype(np.float64)
+                
+                if phongShading:
+                    
+                    # Calculem el phong Shading:
+                    projected_point = alpha_2D * projectedA + beta_2D * projectedB + gamma_2D * projectedC
+                    real_point = projected_point / (d * pixel_depth_inv)
+                    real_point[2] = 1 / pixel_depth_inv
+                    
+                    # Interpolem la normal a cada pixel amb perspectiva:
+                    vertex_normal = (alpha_2D * normalA + beta_2D * normalB + gamma_2D * normalC) / pixel_depth_inv
+                    
+                    # Analitzem quina cara del triangle estem mirant, recordem que la camera esta al origen:
+                    camera_vector = -real_point
+                    camera_vector_norm = np.linalg.norm(camera_vector)
+                    camera_vector = camera_vector / camera_vector_norm
+                    dot_prod_camera_triangle = np.dot(camera_vector, vertex_normal)
+                    if dot_prod_camera_triangle > 0:
+                        isTriangleFrontside = True
+                    else:
+                        isTriangleFrontside = False
+                    
+                    # Calculem la llum que arriba a cada pixel del triangle:
+                    pixel_intensity = 0
+                    for light in changeBase_light_matrix:
+                        if light[3] == 0 or light[3] == 1: # LLum puntual o direccional
+                            
+                            if light[3] == 0:
+                                L = light[0:3] - real_point
+                            else:
+                                L = light[0:3]
+                                
+                            L_norm = np.linalg.norm(L)
+                            L = L / L_norm
+                            
+                            dot_prod_light = np.dot(L, vertex_normal)
+                            
+                            if dot_prod_light > 0:
+                                isLightFrontside = True
+                            else:
+                                isLightFrontside = False
+                                
+                            if isTriangleFrontside == isLightFrontside:
+                                pixel_intensity += light[4] * abs(dot_prod_light)
+                        else:
+                            pixel_intensity += light[4]
+                            
+                    if pixel_intensity > 1:
+                        pixel_intensity = 1
+                
+                else:
+                    pixel_intensity = 1
                 
                 # Pintem el pixel corresponent
                 if useTexture:
                     img[y0_02, x] = texture_color * pixel_intensity
                 else:
                     img[y0_02, x] = color * pixel_intensity
-            
-            n += 1
         
         while True:
             
@@ -362,103 +370,103 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
             # Interpolacio amb perspectiva amb les coordenades baricentriques -> Z-buffer  
             pixel_depth_inv = alpha * (1 / h0) + beta * (1 / h1) + gamma * (1 / h2)
             
-            if useTexture:
-                # Coordenades de la textura interpolades amb perspectiva:
-                u = (alpha * T0X + beta * T1X + gamma * T2X) / pixel_depth_inv
-                v = (alpha * T0Y + beta * T1Y + gamma * T2Y) / pixel_depth_inv
-                
-                tex_x = u * texture_width
-                tex_y = v * texture_height
-                
-                # Assegurem que les coordenades estiguin dins els limits:
-                tex_x = max(0, min(texture_width - 1, tex_x))
-                tex_y = max(0, min(texture_height - 1, tex_y))
-                
-                if bilinearFilter:
-                    
-                    tx = int(tex_x)
-                    ty = int(tex_y)
-                    fx = tex_x - tx
-                    fy = tex_y - ty
-                    
-                    TL = texture[ty, tx]
-                    
-                    if tx + 1 < texture_width:
-                        TR = texture[ty, tx + 1]
-                    else:
-                        TR = texture[ty, tx]
-                        
-                    if ty + 1 < texture_height:
-                        BL = texture[ty + 1, tx]
-                    else:
-                        BL = texture[ty, tx]
-                        
-                    if tx + 1 < texture_width and ty + 1 < texture_height:
-                        BR = texture[ty + 1, tx + 1]
-                    else:
-                        BR = texture[ty, tx]
-                        
-                    CT = fx * TR + (1 - fx) * TL
-                    CB = fx * BR + (1 - fx) * BL
-                    
-                    texture_color = fy * CB + (1 - fy) * CT
-
-                else:
-                    
-                    tx = int(tex_x)
-                    ty = int(tex_y)
-                    texture_color = texture[ty, tx].astype(np.float64)
-            
-            if phongShading:
-                # Calculem el phong Shading:
-                projected_point = alpha * projectedA + beta * projectedB + gamma * projectedC
-                real_point = projected_point / (d * pixel_depth_inv)
-                real_point[2] = 1 / pixel_depth_inv
-                
-                # Analitzem quina cara del triangle estem mirant, recordem que la camera esta al origen:
-                camera_vector = -real_point
-                camera_vector_norm = np.linalg.norm(camera_vector)
-                camera_vector = camera_vector / camera_vector_norm
-                dot_prod_camera_triangle = np.dot(camera_vector, vertex_normals[0])
-                if dot_prod_camera_triangle > 0:
-                    isTriangleFrontside = True
-                else:
-                    isTriangleFrontside = False
-                
-                # Calculem la llum que arriba a cada pixel del triangle:
-                pixel_intensity = 0
-                for light in changeBase_light_matrix:
-                    if light[3] == 0 or light[3] == 1: # LLum puntual o direccional
-                        
-                        if light[3] == 0:
-                            L = light[0:3] - real_point
-                        else:
-                            L = light[0:3]
-                            
-                        L_norm = np.linalg.norm(L)
-                        L = L / L_norm
-                        
-                        dot_prod_light = np.dot(L, vertex_normals[0])
-                        
-                        if dot_prod_light > 0:
-                            isLightFrontside = True
-                        else:
-                            isLightFrontside = False
-                            
-                        if isTriangleFrontside == isLightFrontside:
-                            pixel_intensity += light[4] * abs(dot_prod_light)
-                    else:
-                        pixel_intensity += light[4]
-                        
-                if pixel_intensity > 1:
-                    pixel_intensity = 1
-                    
-            else:
-                pixel_intensity = 1
-            
             if depth_buffer[y0_02, x0_02] < pixel_depth_inv:
                 
                 depth_buffer[y0_02, x0_02] = pixel_depth_inv
+                
+                if useTexture:
+                    # Coordenades de la textura interpolades amb perspectiva:
+                    u = (alpha * T0X + beta * T1X + gamma * T2X) / pixel_depth_inv
+                    v = (alpha * T0Y + beta * T1Y + gamma * T2Y) / pixel_depth_inv
+                    
+                    tex_x = u * texture_width
+                    tex_y = v * texture_height
+                    
+                    # Assegurem que les coordenades estiguin dins els limits:
+                    tex_x = max(0, min(texture_width - 1, tex_x))
+                    tex_y = max(0, min(texture_height - 1, tex_y))
+                    
+                    if bilinearFilter:
+                        
+                        tx = int(tex_x)
+                        ty = int(tex_y)
+                        fx = tex_x - tx
+                        fy = tex_y - ty
+                        
+                        TL = texture[ty, tx]
+                        
+                        if tx + 1 < texture_width:
+                            TR = texture[ty, tx + 1]
+                        else:
+                            TR = texture[ty, tx]
+                            
+                        if ty + 1 < texture_height:
+                            BL = texture[ty + 1, tx]
+                        else:
+                            BL = texture[ty, tx]
+                            
+                        if tx + 1 < texture_width and ty + 1 < texture_height:
+                            BR = texture[ty + 1, tx + 1]
+                        else:
+                            BR = texture[ty, tx]
+                            
+                        CT = fx * TR + (1 - fx) * TL
+                        CB = fx * BR + (1 - fx) * BL
+                        
+                        texture_color = fy * CB + (1 - fy) * CT
+
+                    else:
+                        
+                        tx = int(tex_x)
+                        ty = int(tex_y)
+                        texture_color = texture[ty, tx].astype(np.float64)
+                
+                if phongShading:
+                    # Calculem el phong Shading:
+                    projected_point = alpha * projectedA + beta * projectedB + gamma * projectedC
+                    real_point = projected_point / (d * pixel_depth_inv)
+                    real_point[2] = 1 / pixel_depth_inv
+                    
+                    # Analitzem quina cara del triangle estem mirant, recordem que la camera esta al origen:
+                    camera_vector = -real_point
+                    camera_vector_norm = np.linalg.norm(camera_vector)
+                    camera_vector = camera_vector / camera_vector_norm
+                    dot_prod_camera_triangle = np.dot(camera_vector, vertex_normals[0])
+                    if dot_prod_camera_triangle > 0:
+                        isTriangleFrontside = True
+                    else:
+                        isTriangleFrontside = False
+                    
+                    # Calculem la llum que arriba a cada pixel del triangle:
+                    pixel_intensity = 0
+                    for light in changeBase_light_matrix:
+                        if light[3] == 0 or light[3] == 1: # LLum puntual o direccional
+                            
+                            if light[3] == 0:
+                                L = light[0:3] - real_point
+                            else:
+                                L = light[0:3]
+                                
+                            L_norm = np.linalg.norm(L)
+                            L = L / L_norm
+                            
+                            dot_prod_light = np.dot(L, vertex_normals[0])
+                            
+                            if dot_prod_light > 0:
+                                isLightFrontside = True
+                            else:
+                                isLightFrontside = False
+                                
+                            if isTriangleFrontside == isLightFrontside:
+                                pixel_intensity += light[4] * abs(dot_prod_light)
+                        else:
+                            pixel_intensity += light[4]
+                            
+                    if pixel_intensity > 1:
+                        pixel_intensity = 1
+                        
+                else:
+                    pixel_intensity = 1
                
                 # Pintem el pixel corresponent
                 if useTexture:

@@ -1,6 +1,6 @@
 from cameraObj import camera
 import numpy as np
-from Scene_Obj import Scene, Triangle, Rectangle, RectanglePrisma
+from Scene_Obj import Scene, Triangle, Rectangle, RectanglePrisma, Sphere
 from rasterizing_algorithms import Bresenham_Algorithm, PrintTriangle, PrintTriangleWireframe
 from numba import njit, jit
 from numba import cuda
@@ -26,10 +26,54 @@ Camera = camera(camera_pos, d, pixels_x, pixels_y, len_x, len_y)
 Camera.followPoint([0,0,0])
 
 # Coordenades [X, Y, Z]:
+    
 # scene.addInstance(RectanglePrisma([-1,1,0], [1,1,0], [-1,-1,0], [-1,1,5], [0,0,255], 0.2, 0))
 
 # Minecraft Cube :D
-scene.addInstance(RectanglePrisma([-1,1,0], [1,1,0], [-1,-1,0], [-1,1,2], [0,0,255], 0.2, 0))
+minecraft_cube = RectanglePrisma([-1,1,0], [1,1,0], [-1,-1,0], [-1,1,2], [0,0,255], 0.2, 0)
+
+### minecraft_cube.setTriangleTexels(triangle_index, T0x, T0y, T1x, T1y, T2x, T2y)
+
+# Cara inferior
+minecraft_cube.setTriangleTexels(0, 1, 1, 1, 0, 0, 1)
+minecraft_cube.setTriangleTexels(1, 0, 1, 1, 0, 0, 0)
+
+# Cara superior
+minecraft_cube.setTriangleTexels(2, 1, 1, 1, 0, 0, 1)
+minecraft_cube.setTriangleTexels(3, 0, 1, 1, 0, 0, 0)
+
+# Cara darrera
+minecraft_cube.setTriangleTexels(4, 1, 1, 1, 0, 0, 1)
+minecraft_cube.setTriangleTexels(5, 0, 1, 1, 0, 0, 0)
+
+# Cara dreta - La primera que veiem
+minecraft_cube.setTriangleTexels(6, 1, 1, 1, 0, 0, 1)
+minecraft_cube.setTriangleTexels(7, 0, 1, 1, 0, 0, 0)
+
+# Cara davant
+minecraft_cube.setTriangleTexels(8, 1, 1, 1, 0, 0, 1)
+minecraft_cube.setTriangleTexels(9, 0, 1, 1, 0, 0, 0)
+
+# Cara esquerra
+minecraft_cube.setTriangleTexels(10, 1, 1, 1, 0, 0, 1)
+minecraft_cube.setTriangleTexels(11, 0, 1, 1, 0, 0, 0)
+
+minecraft_cube.setTriangleTexture([0,1,2,3,4,5,6,7,8,9,10,11], [3,3,1,1,2,2,2,2,2,2,2,2])
+
+scene.addInstance(minecraft_cube)
+
+# Colored triangle:
+colored_triangle = Triangle([-0.5,0,3],[1,5,3],[1,0,9], [0,0,250], 0.2, 0)
+colored_triangle.setTriangleTexture([0], [0])
+colored_triangle.setTriangleTexels(0, 0.2, 0.2, 1, 0.2, 0.5, 1)
+
+# Reversed Colored triangle (Back face culling):
+reversed_colored_triangle = Triangle([-0.5,0,3],[1,0,9],[1,5,3], [0,0,250], 0.2, 0)
+reversed_colored_triangle.setTriangleTexture([0], [0])
+reversed_colored_triangle.setTriangleTexels(0, 0.2, 0.2, 0.5, 1, 1, 0.2)
+
+scene.addInstance(colored_triangle)
+scene.addInstance(reversed_colored_triangle)
 
 # scene.addInstance(Triangle([-0.5,0,0],[1,5,0],[1,0,6], [0,0,250], 0.2, 0))
 # scene.addInstance(Triangle([0,0,0],[0,5,0],[0,0,6], [0,250,0], 0.2, 0))
@@ -37,18 +81,19 @@ scene.addInstance(RectanglePrisma([-1,1,0], [1,1,0], [-1,-1,0], [-1,1,2], [0,0,2
 # scene.addInstance(Triangle([0,0,0],[6,0,0],[0,5,0], [0,0,250], 0.2, 0))
 # scene.addInstance(Triangle([0,0,0],[0,5,0],[0,0,6], [0,250,0], 0.2, 0))
 
-# scene.addRectangle([0,0,0],[-5,0,0],[0,5,0], [200,50,250])
-# scene.addSphere([0,0,0], 1.0, 2, [100,200,100])
+scene.addInstance(Sphere([0,-3,0], 1.0, 2, [100,200,100], -1, 0))
 
 # scene.addLight([5,5,5], "puntual", 0.6)
-scene.addLight([1.5,1,1], "puntual", 0.8)
-scene.addLight([-5,5,5], "directional", 0.1)
-scene.addLight([0,0,0], "ambiental", 0.1)
+scene.addLight([1.5,1,1], "puntual", 0.6)
+scene.addLight([-5,5,5], "directional", 0.2)
+scene.addLight([0,0,0], "ambiental", 0.2)
 
 texture_array = np.asarray(Image.open("texture_example.jpg"))
 grass = np.asarray(Image.open("Grass_Block.jpg"))
 grass_dirt = np.asarray(Image.open("Grass_Block_Dirt.jpg"))
 dirt = np.asarray(Image.open("Dirt.jpg"))
+
+texture_list = [texture_array, grass, grass_dirt, dirt]
 
 number_triangles = scene.total_triangles
 number_vertexs = scene.total_vertexs
@@ -58,32 +103,17 @@ triangles = np.empty((number_triangles,3), dtype = np.uint16)
 triangle_color = np.empty((number_triangles,3), dtype = np.uint8)
 triangle_specular = np.empty(number_triangles, dtype = np.float32)
 triangle_reflectance = np.empty(number_triangles, dtype = np.float32)
-triangle_texels = np.empty((number_triangles,3,2))
 triangle_vertexs_normal = np.empty((number_triangles, 3, 3))
 
-for n in range(number_triangles):
-    T0X = 0.2
-    T0Y = 0.2
-    
-    T1X = 1
-    T1Y = 0.2
-    
-    T2X = 0.5
-    T2Y = 1
-    
-    triangle_texels[n,0,0] = T0X
-    triangle_texels[n,0,1] = T0Y
-    
-    triangle_texels[n,1,0] = T1X
-    triangle_texels[n,1,1] = T1Y
-    
-    triangle_texels[n,2,0] = T2X
-    triangle_texels[n,2,1] = T2Y
+triangle_texels = np.empty((number_triangles,3,2))
+triangle_texture_associated = np.empty(number_triangles, dtype = np.int32)
 
 index_vertexs = 0
 index_triangles = 0
 index_add_triangle_vertexs = 0
 index_vertex_normal = 0
+index_texels = 0
+index_texture = 0
 
 for instance in scene.instances:
     
@@ -100,6 +130,14 @@ for instance in scene.instances:
         triangle_reflectance[index_triangles] = instance.reflectance
         
         index_triangles += 1
+        
+    for texel in instance.texels:
+        triangle_texels[index_texels] = texel
+        index_texels += 1
+        
+    for triangle_texture in instance.texture_index:
+        triangle_texture_associated[index_texture] = triangle_texture
+        index_texture += 1
         
     for vertex_normal in instance.triangle_vertexs_normal:
         triangle_vertexs_normal[index_vertex_normal] = vertex_normal
@@ -125,10 +163,10 @@ for light in scene.lights:
     
 # /////////////////////////// FUNCTIONS ///////////////////////////////////////
 
-def print_image(image, depth_buffer, texture_array, changeBaseMatrix, 
+def print_image(image, depth_buffer, texture_list, changeBaseMatrix, 
                 clippingPlanes, vertexs, triangle_texels, triangles, 
                 triangle_color, triangle_specular, triangle_reflectance, 
-                triangle_vertexs_normal, light_matrix, 
+                triangle_vertexs_normal, light_matrix, triangle_texture_associated, 
                 camera_pos, d, len_x, len_y, len_pixelX, len_pixelY):
  
     changeBaseMatrix = np.ascontiguousarray(changeBaseMatrix)
@@ -168,6 +206,7 @@ def print_image(image, depth_buffer, texture_array, changeBaseMatrix,
     new_triangle_color = np.empty((0,3))
     new_triangles = np.empty((0,3))
     new_triangle_texels = np.empty((0,3,2))
+    new_triangle_associated_texture = np.empty((0,), dtype = np.int32)
     new_triangle_vertexs_normal = np.empty((0,3,3))
     
     # Calculem els nous vertexs:
@@ -176,13 +215,27 @@ def print_image(image, depth_buffer, texture_array, changeBaseMatrix,
         indexA = triangles[n,0]
         indexB = triangles[n,1]
         indexC = triangles[n,2]
+        
+        # Back Face Culling:
+        Camera_vector = changeBase_vertexs[indexA]
+        triangle_normal = changeBase_triangle_vertexs_normal[n][0]
+        dot_prod_triangle_camera = np.dot(Camera_vector, triangle_normal)
+        
+        if dot_prod_triangle_camera < 0:
+            continue
+
         color = triangle_color[n]
         t_texels = np.array([triangle_texels[n]])
+        associated_texture = np.array([triangle_texture_associated[n]])
         
         triangle_vertexs = np.array([[changeBase_vertexs[indexA], changeBase_vertexs[indexB], changeBase_vertexs[indexC]]])
         
-        new_vertexs, new_triangles, new_triangle_color, new_triangle_texels, new_triangle_vertexs_normal = \
-        ClipTriangle(triangle_vertexs, color, clippingPlanes, new_vertexs, new_triangles, new_triangle_color, t_texels, [changeBase_triangle_vertexs_normal[n]], new_triangle_texels, new_triangle_vertexs_normal)
+        new_vertexs, new_triangles, new_triangle_color, new_triangle_texels, new_triangle_vertexs_normal, new_triangle_associated_texture = \
+        ClipTriangle(triangle_vertexs, color, clippingPlanes, new_vertexs, 
+                     new_triangles, new_triangle_color, t_texels, 
+                     [changeBase_triangle_vertexs_normal[n]], 
+                     new_triangle_texels, new_triangle_vertexs_normal, 
+                     new_triangle_associated_texture, associated_texture)
         
     if new_vertexs.shape[0] == 0:
         return image
@@ -225,13 +278,14 @@ def print_image(image, depth_buffer, texture_array, changeBaseMatrix,
         indexA = new_triangles[n,0]
         indexB = new_triangles[n,1]
         indexC = new_triangles[n,2]
-        
+        texture_index = int(new_triangle_associated_texture[n])
+        useTexture = True if texture_index != -1 else False
         color = new_triangle_color[n]
         vertex_normals = new_triangle_vertexs_normal[n]
             
         PrintTriangle(image,
                       depth_buffer,
-                      texture_array,
+                      texture_list[texture_index],
                       pixel_coords_x[indexA], pixel_coords_y[indexA], 
                       pixel_coords_x[indexB], pixel_coords_y[indexB],
                       pixel_coords_x[indexC], pixel_coords_y[indexC], 
@@ -248,21 +302,28 @@ def print_image(image, depth_buffer, texture_array, changeBaseMatrix,
                       projected_vertexs[indexC],
                       vertex_normals,
                       d,
-                      phongShading=True,
-                      useTexture=True,
-                      bilinearFilter=True)
+                      phongShading=False,
+                      useTexture=useTexture,
+                      bilinearFilter=False)
             
     return image
 
 def SignedDistance(point, plane):
     return point[0]*plane[0] + point[1]*plane[1] + point[2]*plane[2] + plane[3]
 
-def ClipTriangle(clipped_triangles, color, planes, new_vertexs, new_triangles, new_triangle_color, triangle_texels, triangle_vertexs_normal, new_triangle_texels, new_triangle_vertexs_normal):
+def ClipTriangle(clipped_triangles, color, planes, new_vertexs, new_triangles, 
+                 new_triangle_color, triangle_texels, triangle_vertexs_normal,
+                 new_triangle_texels, new_triangle_vertexs_normal, 
+                 new_triangle_associated_texture, triangle_texture_associated):
+    
     # Aquesta funcio pot retornar 0, 1 o 2 triangles
     for plane in planes:
-        clipped_triangles, triangle_texels, triangle_vertexs_normal = ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_vertexs_normal, plane)
+        
+        clipped_triangles, triangle_texels, triangle_vertexs_normal, triangle_associated_textures = \
+        ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_vertexs_normal, triangle_texture_associated, plane)
+        
         if clipped_triangles.shape[0] == 0:
-            return new_vertexs, new_triangles, new_triangle_color, new_triangle_texels, new_triangle_vertexs_normal
+            return new_vertexs, new_triangles, new_triangle_color, new_triangle_texels, new_triangle_vertexs_normal, new_triangle_associated_texture
         
     index_vertexs = new_vertexs.shape[0]
     
@@ -282,15 +343,17 @@ def ClipTriangle(clipped_triangles, color, planes, new_vertexs, new_triangles, n
         
     new_triangle_texels = np.vstack((new_triangle_texels, triangle_texels))
     new_triangle_vertexs_normal = np.vstack((new_triangle_vertexs_normal, triangle_vertexs_normal))
-        
-    return new_vertexs, new_triangles, new_triangle_color, new_triangle_texels, new_triangle_vertexs_normal
+    new_triangle_associated_texture = np.append(new_triangle_associated_texture, triangle_associated_textures)
+    
+    return new_vertexs, new_triangles, new_triangle_color, new_triangle_texels, new_triangle_vertexs_normal, new_triangle_associated_texture
 
         
-def ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_vertexs_normal, plane):
+def ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_vertexs_normal, triangle_texture_associated, plane):
     
     returned_triangles = np.empty((0,3,3))
     returned_texels = np.empty((0,3,2))
     returned_triangle_vertexs_normal = np.empty((0,3,3))
+    returned_associated_textures = np.empty((0,))
     
     k = 0
     for triangle in clipped_triangles:
@@ -301,7 +364,7 @@ def ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_verte
         # Test per comprovar que estem analitzant un triangle i no un segment
         area_indicator = (B[1] - C[1])*(A[0] - C[0]) + (C[0] - B[0])*(A[1] - C[1])
         if area_indicator == 0:
-            return returned_triangles, returned_texels, returned_triangle_vertexs_normal
+            return returned_triangles, returned_texels, returned_triangle_vertexs_normal, returned_associated_textures
         
         T0 = triangle_texels[k, 0]
         T1 = triangle_texels[k, 1]
@@ -322,6 +385,7 @@ def ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_verte
             returned_triangles = np.vstack((returned_triangles, [[A,B,C]]))
             returned_texels = np.vstack((returned_texels, [[T0,T1,T2]]))
             returned_triangle_vertexs_normal = np.vstack((returned_triangle_vertexs_normal, [vertex_normals]))
+            returned_associated_textures = np.append(returned_associated_textures, triangle_texture_associated)
             continue
         
         # d0 >= d1 >= d2
@@ -363,7 +427,7 @@ def ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_verte
             returned_triangles = np.vstack((returned_triangles, [[A,B_prima,C_prima]]))
             returned_texels = np.vstack((returned_texels, [[T0,T1_prima,T2_prima]]))
             returned_triangle_vertexs_normal = np.vstack((returned_triangle_vertexs_normal, [vertex_normals]))
-    
+            returned_associated_textures = np.append(returned_associated_textures, triangle_texture_associated)
         # Si tenim dos punts dintre i 1 punt fora, C es el que esta a fora:
         else:
             
@@ -396,7 +460,10 @@ def ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_verte
             returned_triangle_vertexs_normal = np.vstack((returned_triangle_vertexs_normal, [vertex_normals]))
             returned_triangle_vertexs_normal = np.vstack((returned_triangle_vertexs_normal, [vertex_normals]))
             
-    return returned_triangles, returned_texels, returned_triangle_vertexs_normal
+            returned_associated_textures = np.append(returned_associated_textures, triangle_texture_associated)
+            returned_associated_textures = np.append(returned_associated_textures, triangle_texture_associated)
+            
+    return returned_triangles, returned_texels, returned_triangle_vertexs_normal, returned_associated_textures
 
 
 # /////////////////////////////// PRINT ///////////////////////////////////////
@@ -522,7 +589,7 @@ while not glfw.window_should_close(window):
     
     image = print_image(np.copy(blank_image), 
                         np.copy(depth_buffer_init),
-                        dirt, 
+                        texture_list, 
                         Camera.changeBaseMatrix, 
                         Camera.clippingPlanes, 
                         vertexs, 
@@ -533,6 +600,7 @@ while not glfw.window_should_close(window):
                         triangle_reflectance, 
                         triangle_vertexs_normal, 
                         light_matrix,
+                        triangle_texture_associated,
                         *inputs)
     
     # Apliquem la nova imatge a la textura
@@ -544,7 +612,7 @@ while not glfw.window_should_close(window):
     # Actualitzem la finestra - Carrega la textura que esta en el buffer de la pantalla
     glfw.swap_buffers(window)
 
-# Terminar la aplicación
+# Tanquem el programa
 glfw.destroy_window(window)
 glfw.terminate()
 

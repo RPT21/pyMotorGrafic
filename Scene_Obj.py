@@ -23,8 +23,21 @@ class Triangle:
         
         self.triangle_vertexs_normal = np.array([[normal, normal, normal]], dtype = np.float64)
         
+        # Cada triangle te 3 vertexs, i cada vertex te dos texels
+        self.texels = np.zeros((1,3,2))
+        
+        # De la llista de textures, quina li correspon a cada triangle
+        self.texture_index = -np.ones(1)
+        
         self.number_vertexs = 3
         self.number_triangles = 1
+        
+    def setTriangleTexture(self, triangle_index, texture_index):
+        for index in triangle_index:
+            self.texture_index[index] = texture_index[index]
+        
+    def setTriangleTexels(self, triangle_index, T0x, T0y, T1x, T1y, T2x, T2y):
+        self.texels[triangle_index] = np.array([[T0x, T0y],[T1x, T1y],[T2x, T2y]])
         
 class Rectangle:
     
@@ -36,7 +49,7 @@ class Rectangle:
         vertex3 = vertex1 + vertex2 - vertex0
         
         self.vertexs = np.array([vertex0, vertex1, vertex2, vertex3], dtype = np.float64)
-        self.triangles = np.array([[0, 1, 2], [3, 2, 1]], dtype = np.uint16)
+        self.triangles = np.array([[0, 1, 2], [2, 1, 3]], dtype = np.uint16)
         self.color = np.array(color, dtype = np.uint8)
         self.specular = specular
         self.reflectance = reflectance
@@ -50,8 +63,21 @@ class Rectangle:
             normal = normal / norm
             self.triangle_vertexs_normal = np.vstack((self.triangle_vertexs_normal, [[normal, normal, normal]]))
         
+        # Cada triangle te 3 vertexs, i cada vertex te dos texels
+        self.texels = np.zeros((2,3,2))
+        
+        # De la llista de textures, quina li correspon a cada triangle
+        self.texture_index = -np.ones(2)
+        
         self.number_vertexs = 4
         self.number_triangles = 2
+        
+    def setTriangleTexture(self, triangle_index, texture_index):
+        for index in triangle_index:
+            self.texture_index[index] = texture_index[index]
+        
+    def setTriangleTexels(self, triangle_index, T0x, T0y, T1x, T1y, T2x, T2y):
+        self.texels[triangle_index] = np.array([[T0x, T0y],[T1x, T1y],[T2x, T2y]])
         
 class RectanglePrisma():
     
@@ -70,7 +96,16 @@ class RectanglePrisma():
         vertex7 = vertexH + vertex3 #3H
 
         self.vertexs = np.array([vertex0, vertex1, vertex2, vertex3, vertex4, vertex5, vertex6, vertex7], dtype = np.float64)
-        self.triangles = np.array([[0, 1, 2], [4, 6, 5], [0, 4, 1], [0, 2, 4], [1, 5, 3], [2, 3, 6], [3, 2, 1], [7, 5, 6], [1, 4, 5], [4, 2, 6], [3, 5, 7], [3, 7, 6]], dtype = np.uint16)
+        
+        self.triangles = np.array([[0, 1, 2], [2, 1, 3], # Cara inferior - 0, 1
+                                   [4, 6, 5], [5, 6, 7], # Cara superior - 2, 3
+                                   [0, 4, 1], [1, 4, 5], # Cara darrera - 4, 5
+                                   [1, 5, 3], [3, 5, 7], # Cara dreta - 6, 7
+                                   [3, 7, 2], [2, 7, 6], # Cara davant - 8, 9
+                                   [2, 6, 0], [0, 6, 4]], # Cara esquerra - 10, 11
+                                  dtype = np.uint16) 
+        
+        
         self.color = np.array(color, dtype = np.uint8)
         self.specular = specular
         self.reflectance = reflectance
@@ -84,8 +119,56 @@ class RectanglePrisma():
             normal = normal / norm
             self.triangle_vertexs_normal = np.vstack((self.triangle_vertexs_normal, [[normal, normal, normal]]))
         
+        # Cada triangle te 3 vertexs, i cada vertex te dos texels
+        self.texels = np.zeros((12,3,2))
+        
+        # De la llista de textures, quina li correspon a cada triangle
+        self.texture_index = -np.ones(12)
+        
         self.number_vertexs = 8
         self.number_triangles = 12
+        
+    def setTriangleTexture(self, triangle_index, texture_index):
+        for index in triangle_index:
+            self.texture_index[index] = texture_index[index]
+        
+    def setTriangleTexels(self, triangle_index, T0x, T0y, T1x, T1y, T2x, T2y):
+        self.texels[triangle_index] = np.array([[T0x, T0y],[T1x, T1y],[T2x, T2y]])
+        
+class Sphere():
+    
+    def __init__(self, position, radio, subdivisiones, color, specular, reflectance):
+    
+        self.position = np.array(position, dtype = np.float64)
+        
+        # Generar la esfera al origen
+        vertexs, indexs = generar_esfera_icosaedro(radio, subdivisiones)
+        
+        self.vertexs = np.array(vertexs, dtype = np.float64)
+        self.triangles = np.array(indexs)
+        
+        self.color = np.array(color, dtype = np.uint8)
+        self.specular = specular
+        self.reflectance = reflectance
+        
+        self.triangle_vertexs_normal = np.empty((0,3,3), dtype = np.float64)
+        for triangle in self.triangles:
+            vertexA = self.vertexs[triangle[0]]
+            vertexB = self.vertexs[triangle[1]]
+            vertexC = self.vertexs[triangle[2]]
+            self.triangle_vertexs_normal = np.vstack((self.triangle_vertexs_normal, [[vertexA, vertexB, vertexC]]))
+            
+        self.vertexs = self.vertexs + self.position
+        
+        # Cada triangle te 3 vertexs, i cada vertex te dos texels
+        self.texels = np.zeros((self.triangles.shape[0],3,2))
+        
+        # De la llista de textures, quina li correspon a cada triangle
+        self.texture_index = -np.ones(self.triangles.shape[0])
+        
+        self.number_vertexs = self.vertexs.shape[0]
+        self.number_triangles = self.triangles.shape[0]
+    
 
     
 def normalizar_vector(v):
@@ -171,26 +254,6 @@ class Scene:
         self.instances.append(object_instance)
         self.total_vertexs += object_instance.number_vertexs
         self.total_triangles += object_instance.number_triangles
-
-
-        
-    # def addSphere(self, position, radio, subdivisiones, color, specular, reflectance):
-        
-    #     position = np.array(position)
-    #     color = np.array(color) 
-
-    #     # Generar la esfera
-    #     vertices, indices = generar_esfera_icosaedro(radio, subdivisiones)
-        
-    #     for _triangle_ in indices:
-
-    #         # Fem la translacio dels vertexs, ja que la esfera es genera en [0, 0, 0]
-    #         vertex_x = vertices[_triangle_[0]] + position
-    #         vertex_y = vertices[_triangle_[1]] + position
-    #         vertex_z = vertices[_triangle_[2]] + position
-
-    #         self.addTriangle(vertex_x, vertex_y, vertex_z, color, specular, reflectance)
-
               
     def addLight(self, parameter, type_light, intensity):
 
@@ -202,14 +265,17 @@ class Scene:
         light_dict["type"] = type_light
         light_dict["intensity"] = intensity
         
-        
         self.lights.append(light_dict)
         
-        
-rectangle0 = Rectangle([0,0,0],[-5,0,0],[0,5,0], [200,50,250], -1, 0)
-triangle0 = Triangle([0,0,0],[-5,0,0],[0,5,0], [200,50,250], -1, 0)
-triangle1 = Triangle([0,0,0],[0,5,0],[0,0,6], [0,250,0], 0.2, 0)
-RectanglePrisma0 = RectanglePrisma([-1,1,0], [1,1,0], [-1,-1,0], [-1,1,5], [0,0,255], 0.2, 0)
-    
+     
+if __name__ == "__main__":
+    # rectangle0 = Rectangle([0,0,0],[-5,0,0],[0,5,0], [200,50,250], -1, 0)
+    # triangle0 = Triangle([0,0,0],[-5,0,0],[0,5,0], [200,50,250], -1, 0)
+    # triangle1 = Triangle([0,0,0],[0,5,0],[0,0,6], [0,250,0], 0.2, 0)
+    RectanglePrisma0 = RectanglePrisma([-1,1,0], [1,1,0], [-1,-1,0], [-1,1,5], [0,0,255], 0.2, 0)
+    RectanglePrisma0.setTriangleTexels(0, 0, 0, 1, 1, 0.5, 0.5)
+    RectanglePrisma0.setTriangleTexture([0,1,2,3], [1,5,4,8])   
+    sphere0 = Sphere([0,0,0], 1.0, 2, [100,200,100], -1, 0)
+
    
 
