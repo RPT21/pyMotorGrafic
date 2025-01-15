@@ -81,7 +81,9 @@ scene.addInstance(reversed_colored_triangle)
 # scene.addInstance(Triangle([0,0,0],[6,0,0],[0,5,0], [0,0,250], 0.2, 0))
 # scene.addInstance(Triangle([0,0,0],[0,5,0],[0,0,6], [0,250,0], 0.2, 0))
 
-scene.addInstance(Sphere([0,-3,0], 1.0, 2, [100,200,100], -1, 0))
+# scene.addInstance(Sphere([0,-3,0], 1.0, 2, [100,200,100], -1, 0))
+
+# scene.addInstance(Rectangle([-0.5,0,3],[1,5,3],[1,0,9], [0,0,250], 0.2, 0))
 
 # scene.addLight([5,5,5], "puntual", 0.6)
 scene.addLight([1.5,1,1], "puntual", 0.6)
@@ -269,10 +271,6 @@ def print_image(image, depth_buffer, texture_list, changeBaseMatrix,
     pixel_coords_x = np.round(pantalla_x / len_pixelX).astype(np.int32)
     pixel_coords_y = np.round(pantalla_y / len_pixelY).astype(np.int32) # L'eix Y esta invertit en les imatges
     
-    # Si t es negatiu vol dir que el vertex esta darrera la camera.
-    # El parametre t es la distancia del centre de la camera al punt de interseccio amb la pantalla, ja que haviem fet unitari el vector director de la recta.
-    # I aquest vector anava del centre de la camara cap al vertex. EL parametre t per tant ens dona una idea de la profunditat del vertex.
-    
     for n in range(new_triangles.shape[0]):
         
         indexA = new_triangles[n,0]
@@ -329,14 +327,8 @@ def ClipTriangle(clipped_triangles, color, planes, new_vertexs, new_triangles,
     
     for triangle in clipped_triangles:
         
-        new_vertexs = np.vstack((new_vertexs, triangle[0]))
-        new_vertexs = np.vstack((new_vertexs, triangle[1]))
-        new_vertexs = np.vstack((new_vertexs, triangle[2]))
-        
+        new_vertexs = np.vstack((new_vertexs, [triangle[0],triangle[1],triangle[2]]))
         new_triangles = np.vstack((new_triangles, [index_vertexs, index_vertexs + 1, index_vertexs + 2])).astype(int)
-        
-        new_triangle_color = np.vstack((new_triangle_color, color))
-        new_triangle_color = np.vstack((new_triangle_color, color))
         new_triangle_color = np.vstack((new_triangle_color, color))
         
         index_vertexs += 3
@@ -360,11 +352,6 @@ def ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_verte
         A = triangle[0]
         B = triangle[1]
         C = triangle[2]
-        
-        # Test per comprovar que estem analitzant un triangle i no un segment
-        area_indicator = (B[1] - C[1])*(A[0] - C[0]) + (C[0] - B[0])*(A[1] - C[1])
-        if area_indicator == 0:
-            return returned_triangles, returned_texels, returned_triangle_vertexs_normal, returned_associated_textures
         
         T0 = triangle_texels[k, 0]
         T1 = triangle_texels[k, 1]
@@ -451,17 +438,10 @@ def ClipTrianglesAgainstPlane(clipped_triangles, triangle_texels, triangle_verte
             B_prima = B + t*BC
             T1_prima = t*T2 + (1-t)*T1
             
-            returned_triangles = np.vstack((returned_triangles, [[A, A_prima, B]]))
-            returned_triangles = np.vstack((returned_triangles, [[A_prima, B_prima, B]]))
-            
-            returned_texels = np.vstack((returned_texels, [[T0,T0_prima,T1]]))
-            returned_texels = np.vstack((returned_texels, [[T0_prima,T1_prima,T1]]))
-            
-            returned_triangle_vertexs_normal = np.vstack((returned_triangle_vertexs_normal, [vertex_normals]))
-            returned_triangle_vertexs_normal = np.vstack((returned_triangle_vertexs_normal, [vertex_normals]))
-            
-            returned_associated_textures = np.append(returned_associated_textures, triangle_texture_associated)
-            returned_associated_textures = np.append(returned_associated_textures, triangle_texture_associated)
+            returned_triangles = np.vstack((returned_triangles, [[A, A_prima, B], [A_prima, B_prima, B]]))
+            returned_texels = np.vstack((returned_texels, [[T0,T0_prima,T1], [T0_prima,T1_prima,T1]]))
+            returned_triangle_vertexs_normal = np.vstack((returned_triangle_vertexs_normal, [vertex_normals, vertex_normals]))
+            returned_associated_textures = np.append(returned_associated_textures, [triangle_texture_associated, triangle_texture_associated])
             
     return returned_triangles, returned_texels, returned_triangle_vertexs_normal, returned_associated_textures
 

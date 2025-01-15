@@ -175,6 +175,10 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
     x0_02 = x0
     y0_02 = y0
     
+    # Considerem una variable boolena per fer que la comprovacio de canvi de segment
+    # curt nomes es faci quan sigui necessari:
+    LineChanged = False
+    
     # Pintarem les linies horitzontals començant des del costat llarg "02"
     # Anem a determinar el sentit amb el que pintarem les linies horitzontals:
     # Definim la recta que va de (x0, y0) -> (x2, y2), i calculem el punt de interseccio amb la recta y = y1
@@ -187,8 +191,51 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
     
     while True:
         
+        # Guardem la X just abans d'avançar. Si avancem en el sentit contrari
+        # al de pintar, aquesta X es la que ens importa
+        x_final = x0_012
+        
+        while True:
+            
+            # Aquesta recta es la recta curta, que te 2 segments, i s'ha de
+            # recalcular quan arriba al final del primer
+    
+            # Canviem de costat si hem arribat al final de la primera linea
+            # La comprovacio nomes s'ha de fer si encara no hem canviat de linea
+            if not LineChanged:
+                if x0_012 == x1 and y0_012 == y1:
+                    dx_012 = abs(x2 - x1)
+                    dy_012 = abs(y2 - y1)
+                    sx_012 = 1 if x1 <= x2 else -1
+                    err_012 = dx_012 - dy_012
+                    LineChanged = True
+                    
+            e2_012 = 2 * err_012
+
+            if e2_012 > -dy_012:
+                x0_012 += sx_012
+                err_012 -= dy_012
+                
+                # Guardem la X nomes si esta avançant en el sentit de pintar
+                # i si la Y no avança:
+                if sx == sx_012 and not e2_012 < dx_012:
+                    x_final = x0_012
+                    continue
+            
+            if e2_012 < dx_012:
+                y0_012 += sy_012
+                err_012 += dx_012
+                break
+            
+            if y0_012 == y2:
+                break
+         
+        # Un cop la linea curta ha incrementat la seva y en una unitat, sabem
+        # l'interval de x que hem de pintar, ja que tenim guardada la x que 
+        # delimita el segment horitzontal (x_final)
+        
         n = 0
-        for x in range(x0_02, x0_012 + sx, sx):
+        for x in range(x0_02, x_final + sx, sx):
             
             # El pixel buffer tindra el invers de les distancies, anira de 0 a infinit
             # Com mes a prop estigui un objecte, mes gran sera el valor del invers:
@@ -313,28 +360,9 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
                 else:
                     img[y0_02, x] = color * pixel_intensity
         
-        while True:
-            
-            # Aquesta recta es la recta curta, que te 2 segments, i s'ha de
-            # recalcular quan arriba al final del primer
-    
-            # Canviem de costat si hem arribat al final
-            if x0_012 == x1 and y0_012 == y1:
-                dx_012 = abs(x2 - x1)
-                dy_012 = abs(y2 - y1)
-                sx_012 = 1 if x1 <= x2 else -1
-                err_012 = dx_012 - dy_012
-            
-            e2_012 = 2 * err_012
-            
-            if e2_012 > -dy_012:
-                x0_012 += sx_012
-                err_012 -= dy_012 
-                
-            if e2_012 < dx_012:
-                y0_012 += sy_012
-                err_012 += dx_012
-                break
+        if y0_02 == y2:
+            # Si hem pintat la ultima linea, sortim del programa:
+            break
         
         while True:
             
@@ -351,7 +379,6 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
                 beta += beta_dx * sx_02
                 gamma += gamma_dx * sx_02
                 
-                
             if e2_02 < dx_02:
                 
                 y0_02 += sy_02
@@ -361,121 +388,25 @@ def PrintTriangle(img, depth_buffer, texture, x0, y0, x1, y1, x2, y2, color,
                 beta += beta_dy
                 gamma += gamma_dy
                 
+                if sx_02 == sx:
+                    # Si estem avançant en el mateix sentit que el de pintar,
+                    # segur que estem al borde del triangle
+                    break
+                
+            if y0_02 == y2:
+                # Si hem arribat a l'ultim punt:
                 break
             
-        if y0_02 == y2:
-            
-            # Si hem arribat al final, pintem l'ultim punt i sortim del loop:
+            # Si estem avançant en sentit contrari al de pintar:
+            if sx_02 != sx:
                 
-            # Interpolacio amb perspectiva amb les coordenades baricentriques -> Z-buffer  
-            pixel_depth_inv = alpha * (1 / h0) + beta * (1 / h1) + gamma * (1 / h2)
-            
-            if depth_buffer[y0_02, x0_02] < pixel_depth_inv:
+                # Mirem l'accio posterior que fara la recta
+                e2_02 = 2 * err_02
                 
-                depth_buffer[y0_02, x0_02] = pixel_depth_inv
-                
-                if useTexture:
-                    # Coordenades de la textura interpolades amb perspectiva:
-                    u = (alpha * T0X + beta * T1X + gamma * T2X) / pixel_depth_inv
-                    v = (alpha * T0Y + beta * T1Y + gamma * T2Y) / pixel_depth_inv
-                    
-                    tex_x = u * texture_width
-                    tex_y = v * texture_height
-                    
-                    # Assegurem que les coordenades estiguin dins els limits:
-                    tex_x = max(0, min(texture_width - 1, tex_x))
-                    tex_y = max(0, min(texture_height - 1, tex_y))
-                    
-                    if bilinearFilter:
-                        
-                        tx = int(tex_x)
-                        ty = int(tex_y)
-                        fx = tex_x - tx
-                        fy = tex_y - ty
-                        
-                        TL = texture[ty, tx]
-                        
-                        if tx + 1 < texture_width:
-                            TR = texture[ty, tx + 1]
-                        else:
-                            TR = texture[ty, tx]
-                            
-                        if ty + 1 < texture_height:
-                            BL = texture[ty + 1, tx]
-                        else:
-                            BL = texture[ty, tx]
-                            
-                        if tx + 1 < texture_width and ty + 1 < texture_height:
-                            BR = texture[ty + 1, tx + 1]
-                        else:
-                            BR = texture[ty, tx]
-                            
-                        CT = fx * TR + (1 - fx) * TL
-                        CB = fx * BR + (1 - fx) * BL
-                        
-                        texture_color = fy * CB + (1 - fy) * CT
-
-                    else:
-                        
-                        tx = int(tex_x)
-                        ty = int(tex_y)
-                        texture_color = texture[ty, tx].astype(np.float64)
-                
-                if phongShading:
-                    # Calculem el phong Shading:
-                    projected_point = alpha * projectedA + beta * projectedB + gamma * projectedC
-                    real_point = projected_point / (d * pixel_depth_inv)
-                    real_point[2] = 1 / pixel_depth_inv
-                    
-                    # Interpolem la normal a cada pixel amb perspectiva:
-                    vertex_normal = (alpha * normalA + beta * normalB + gamma * normalC) / pixel_depth_inv
-                    
-                    # Analitzem quina cara del triangle estem mirant, recordem que la camera esta al origen:
-                    camera_vector = -real_point
-                    camera_vector_norm = np.linalg.norm(camera_vector)
-                    camera_vector = camera_vector / camera_vector_norm
-                    dot_prod_camera_triangle = np.dot(camera_vector, vertex_normal)
-                    if dot_prod_camera_triangle > 0:
-                        isTriangleFrontside = True
-                    else:
-                        isTriangleFrontside = False
-                    
-                    # Calculem la llum que arriba a cada pixel del triangle:
-                    pixel_intensity = 0
-                    for light in changeBase_light_matrix:
-                        if light[3] == 0 or light[3] == 1: # LLum puntual o direccional
-                            
-                            if light[3] == 0:
-                                L = light[0:3] - real_point
-                            else:
-                                L = light[0:3]
-                                
-                            L_norm = np.linalg.norm(L)
-                            L = L / L_norm
-                            
-                            dot_prod_light = np.dot(L, vertex_normal)
-                            
-                            if dot_prod_light > 0:
-                                isLightFrontside = True
-                            else:
-                                isLightFrontside = False
-                                
-                            if isTriangleFrontside == isLightFrontside:
-                                pixel_intensity += light[4] * abs(dot_prod_light)
-                        else:
-                            pixel_intensity += light[4]
-                            
-                    if pixel_intensity > 1:
-                        pixel_intensity = 1
-                        
+                # Si la X avança pero la Y no avança:
+                if e2_02 > -dy_02 and not e2_02 < dx_02:
+                    # Podem avançar
+                    continue
                 else:
-                    pixel_intensity = 1
-               
-                # Pintem el pixel corresponent
-                if useTexture:
-                    img[y0_02, x0_02] = texture_color * pixel_intensity
-                else:
-                    img[y0_02, x0_02] = color * pixel_intensity
-                    
-            break
-
+                    # Aturem el programa si la Y avança
+                    break
